@@ -1,5 +1,9 @@
 # ad-lab-iac
 
+Part of a broader infrastructure-as-code portfolio — see also [`fortigate-iac`](https://github.com/CamParent/fortigate-iac) (network security automation) and [`iac-foundation`](https://github.com/CamParent/iac-foundation) (Azure landing zone).
+
+[![Harden AD Lab](https://github.com/CamParent/ad-lab-iac/actions/workflows/harden.yml/badge.svg)](https://github.com/CamParent/ad-lab-iac/actions/workflows/harden.yml)
+
 Ansible automation for hardening a self-built Active Directory lab running on Proxmox. This repo automates a security control I implemented manually first — renaming and disabling the built-in Administrator account across a domain controller, a management jump host, and a domain-joined workstation — and packages it as an idempotent, re-runnable role.
 
 ## Environment
@@ -17,6 +21,10 @@ Supporting controls already in place on the lab itself (not part of this repo, d
 - External NTP sync configured on the PDC emulator
 - DNS forwarders configured for internet resolution
 - WinRM enabled on all three hosts for Ansible remote management
+
+## Relevance
+
+This models the identity-hardening discipline — privileged account lockdown, and handling the split between domain and local account semantics — that carries directly into AD-to-Entra ID hybrid identity migrations and other identity-as-code work.
 
 ## What this automates
 
@@ -96,3 +104,7 @@ For the automated GitHub Actions run, which can't respond to an interactive prom
 - Second run against already-hardened hosts confirmed `changed=0` across all three hosts, validating idempotency
 - `whoami` / `Get-ADUser -Properties MemberOf` used to confirm the replacement domain admin account (`cparent-adm`) had working Domain Admin rights before any built-in Administrator account was disabled, to avoid a lockout scenario
 - End-to-end CI pipeline confirmed working: a push to `main` triggered the self-hosted runner, which checked out the repo and executed the playbook successfully against all three live hosts over WinRM
+
+## Roadmap
+
+Next: extending this lab with Entra ID Connect to test hybrid identity sync, and validating Conditional Access policy behavior against hybrid-joined devices.
