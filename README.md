@@ -40,6 +40,9 @@ That's the reasoning baked into this role: it doesn't rely on GPO for either the
 
 ```
 ad-lab-iac/
+├── .github/
+│   └── workflows/
+│       └── harden.yml         # CI trigger: push to main + manual dispatch
 ├── inventory/
 │   └── hosts.yml              # dc01, mgmt01, ws01 grouped by role
 ├── group_vars/
@@ -58,6 +61,8 @@ ad-lab-iac/
 
 ## Usage
 
+### Manual run
+
 Requires the `ansible.windows` collection and WinRM configured on target hosts (HTTPS listener, NTLM auth).
 
 ```bash
@@ -68,9 +73,21 @@ ansible-playbook -i inventory/hosts.yml playbooks/harden_local_admin.yml --ask-p
 
 You'll be prompted for the WinRM connection password for the domain admin account used to run the play.
 
+### Automated run (GitHub Actions)
+
+`.github/workflows/harden.yml` runs the same playbook automatically on every push to `main`, and can also be triggered manually from the Actions tab (`workflow_dispatch`).
+
+It runs on a **self-hosted runner** rather than a GitHub-hosted one, since the target hosts (`192.168.1.x`) sit on a private LAN that GitHub's hosted runners can't reach. The runner is registered on the same host that already runs runners for two other repos (`fortigate-iac`, `iac-foundation`), each as its own independent systemd service.
+
+The WinRM connection password is supplied via a GitHub Actions repository secret (`WINRM_PASSWORD`) and passed to Ansible with `--extra-vars` at runtime — not through Ansible Vault, for the reason described below.
+
 ## Notes on credential handling
 
-This repo intentionally does not commit any vaulted or plaintext credentials. Connection passwords are supplied at runtime via `--ask-pass`. An earlier iteration attempted to store the connection password as an Ansible Vault-encrypted variable, but hit a reproducible issue on the Ansible version used here where vault-encrypted values assigned directly to connection variables (`ansible_password`) weren't reliably decrypted before the WinRM connection plugin consumed them, while the same vaulted value worked fine as a regular templated variable. Prompting at runtime sidesteps this and keeps no credential material on disk at all.
+This repo intentionally does not commit any vaulted or plaintext credentials.
+
+For manual runs, the connection password is supplied interactively via `--ask-pass`. An earlier iteration attempted to store the connection password as an Ansible Vault-encrypted variable, but hit a reproducible issue on the Ansible version used at the time, where vault-encrypted values assigned directly to connection variables (`ansible_password`) weren't reliably decrypted before the WinRM connection plugin consumed them, while the same vaulted value worked fine as a regular templated variable. Prompting at runtime sidesteps this and keeps no credential material on disk at all.
+
+For the automated GitHub Actions run, which can't respond to an interactive prompt, the password is instead stored as a GitHub repository secret and injected via `--extra-vars` at runtime — never committed to the repo, never written to disk on the runner outside of process memory for the duration of the job.
 
 ## Verification performed
 
@@ -78,3 +95,4 @@ This repo intentionally does not commit any vaulted or plaintext credentials. Co
 - First run confirmed correct rename/disable behavior against hosts in a known, un-hardened state (validated manually beforehand)
 - Second run against already-hardened hosts confirmed `changed=0` across all three hosts, validating idempotency
 - `whoami` / `Get-ADUser -Properties MemberOf` used to confirm the replacement domain admin account (`cparent-adm`) had working Domain Admin rights before any built-in Administrator account was disabled, to avoid a lockout scenario
+- End-to-end CI pipeline confirmed working: a push to `main` triggered the self-hosted runner, which checked out the repo and executed the playbook successfully against all three live hosts over WinRM
