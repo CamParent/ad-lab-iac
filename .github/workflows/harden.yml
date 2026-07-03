@@ -1,0 +1,19 @@
+name: Harden Local Administrator Accounts
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  harden:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run local admin hardening playbook
+        run: |
+          ansible-playbook -i inventory/hosts.yml playbooks/harden_local_admin.yml \
+            --extra-vars "ansible_password=${{ secrets.WINRM_PASSWORD }}" \
+            --extra-vars "ansible_user=cparent-adm"
