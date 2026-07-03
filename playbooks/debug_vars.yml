@@ -1,0 +1,8 @@
+---
+- name: Debug variable scope
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Show local_admin_target_name
+      ansible.builtin.debug:
+        var: local_admin_target_name

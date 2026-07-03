@@ -1,0 +1,8 @@
+---
+- name: Include domain controller tasks
+  ansible.builtin.include_tasks: domain_controller.yml
+  when: "'domain_controllers' in group_names"
+
+- name: Include member server tasks
+  ansible.builtin.include_tasks: member_server.yml
+  when: "'member_servers' in group_names"

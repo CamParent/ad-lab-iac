@@ -1,0 +1,26 @@
+---
+- name: Get current SamAccountName of domain Administrator account (SID -500)
+  ansible.windows.win_shell: |
+    $domainSid = (Get-ADDomain).DomainSID.Value
+    (Get-ADUser -Filter * | Where-Object { $_.SID -like "$domainSid-500" }).SamAccountName
+  register: current_domain_admin
+  changed_when: false
+
+- name: Rename domain Administrator account object and SamAccountName
+  ansible.windows.win_shell: |
+    Rename-ADObject -Identity (Get-ADUser -Identity "{{ current_domain_admin.stdout | trim }}").DistinguishedName -NewName "{{ local_admin_target_name }}"
+    Set-ADUser -Identity "{{ current_domain_admin.stdout | trim }}" -SamAccountName "{{ local_admin_target_name }}" -UserPrincipalName "{{ local_admin_target_name }}@{{ domain_name }}"
+  when: current_domain_admin.stdout | trim != local_admin_target_name
+  register: dc_rename_result
+
+- name: Check if domain Administrator account is currently enabled
+  ansible.windows.win_shell: |
+    (Get-ADUser -Identity "{{ local_admin_target_name }}" -Properties Enabled).Enabled
+  register: dc_admin_enabled_check
+  changed_when: false
+
+- name: Disable domain Administrator account
+  ansible.windows.win_shell: |
+    Disable-ADAccount -Identity "{{ local_admin_target_name }}"
+  when: dc_admin_enabled_check.stdout | trim == "True"
+  register: dc_disable_result

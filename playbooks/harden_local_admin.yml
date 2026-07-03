@@ -1,0 +1,6 @@
+---
+- name: Harden built-in Administrator accounts across the lab
+  hosts: all
+  gather_facts: no
+  roles:
+    - local_admin_hardening

@@ -1,0 +1,24 @@
+---
+- name: Get current name of built-in Administrator account (SID -500)
+  ansible.windows.win_shell: |
+    (Get-LocalUser | Where-Object { $_.SID -like "*-500" }).Name
+  register: current_admin_name
+  changed_when: false
+
+- name: Rename built-in Administrator account
+  ansible.windows.win_shell: |
+    Rename-LocalUser -Name "{{ current_admin_name.stdout | trim }}" -NewName "{{ local_admin_target_name }}"
+  when: current_admin_name.stdout | trim != local_admin_target_name
+  register: rename_result
+
+- name: Check if target account is currently enabled
+  ansible.windows.win_shell: |
+    (Get-LocalUser -Name "{{ local_admin_target_name }}").Enabled
+  register: admin_enabled_check
+  changed_when: false
+
+- name: Disable built-in Administrator account
+  ansible.windows.win_shell: |
+    Disable-LocalUser -Name "{{ local_admin_target_name }}"
+  when: admin_enabled_check.stdout | trim == "True"
+  register: disable_result
