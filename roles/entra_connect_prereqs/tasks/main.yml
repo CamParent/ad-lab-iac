@@ -1,0 +1,60 @@
+---
+- name: Ensure UPN suffix is present on the domain forest
+  ansible.windows.win_shell: |
+    $suffix = "{{ entra_upn_suffix }}"
+    $existing = (Get-ADForest -Identity "{{ domain_name }}").UPNSuffixes
+    if ($existing -notcontains $suffix) {
+        Set-ADForest -Identity "{{ domain_name }}" -UPNSuffixes @{Add=$suffix}
+        Write-Output "added"
+    } else {
+        Write-Output "already present"
+    }
+  register: upn_suffix_result
+  changed_when: "'added' in upn_suffix_result.stdout"
+
+- name: Ensure Groups OU exists
+  microsoft.ad.ou:
+    name: Groups
+    path: "DC=camlab,DC=local"
+    state: present
+
+- name: Ensure sync-scoping security group exists
+  microsoft.ad.group:
+    name: "{{ entra_sync_scope_group }}"
+    path: "{{ entra_sync_scope_group_ou }}"
+    scope: global
+    category: security
+    description: "Group-based scoping filter for Entra Connect Sync -- only members sync to Entra ID"
+    state: present
+
+- name: Ensure ServiceAccounts OU exists
+  microsoft.ad.ou:
+    name: ServiceAccounts
+    path: "DC=camlab,DC=local"
+    state: present
+
+- name: Ensure Entra Connect connector service account exists
+  microsoft.ad.user:
+    name: "{{ entra_connector_account_name }}"
+    path: "{{ entra_connector_account_ou }}"
+    password: "{{ vault_entra_connector_password }}"
+    password_never_expires: true
+    user_cannot_change_password: true
+    enabled: true
+    description: "Delegated account for Entra Connect Sync (DS Connector Account)"
+    state: present
+  no_log: true
+
+- name: Check if replication permissions are already granted
+  ansible.windows.win_shell: |
+    $domainDN = (Get-ADDomain).DistinguishedName
+    dsacls $domainDN | Select-String "{{ entra_connector_account_name }}"
+  register: existing_acl
+  changed_when: false
+
+- name: Grant connector account Replicating Directory Changes permissions
+  ansible.windows.win_shell: |
+    $domainDN = (Get-ADDomain).DistinguishedName
+    dsacls $domainDN /G "CAMLAB\{{ entra_connector_account_name }}:CA;Replicating Directory Changes"
+    dsacls $domainDN /G "CAMLAB\{{ entra_connector_account_name }}:CA;Replicating Directory Changes All"
+  when: "entra_connector_account_name not in existing_acl.stdout"

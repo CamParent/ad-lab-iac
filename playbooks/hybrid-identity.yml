@@ -1,0 +1,12 @@
+---
+- name: Stage Entra Connect Sync prerequisites
+  hosts: domain_controllers
+  gather_facts: no
+  roles:
+    - entra_connect_prereqs
+
+- name: Harden the Entra Connect sync host
+  hosts: sync_hosts
+  gather_facts: no
+  roles:
+    - entra_connect_host_hardening

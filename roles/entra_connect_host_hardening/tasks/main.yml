@@ -1,0 +1,29 @@
+---
+- name: Enforce TLS 1.2 client protocol on the sync host
+  ansible.windows.win_regedit:
+    path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client'
+    name: "{{ item.name }}"
+    data: "{{ item.data }}"
+    type: dword
+    state: present
+  loop:
+    - { name: "Enabled", data: 1 }
+    - { name: "DisabledByDefault", data: 0 }
+
+- name: Enforce strong crypto for .NET Framework
+  ansible.windows.win_regedit:
+    path: 'HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319'
+    name: "SchUseStrongCrypto"
+    data: 1
+    type: dword
+    state: present
+
+- name: Allow outbound HTTPS for Entra ID sync endpoints
+  community.windows.win_firewall_rule:
+    name: "Allow-EntraConnect-Outbound-443"
+    direction: out
+    protocol: tcp
+    remoteport: 443
+    action: allow
+    state: present
+    enabled: true

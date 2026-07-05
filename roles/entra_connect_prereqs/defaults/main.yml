@@ -1,0 +1,6 @@
+---
+entra_upn_suffix: "teslacyberheartgmail.onmicrosoft.com"
+entra_sync_scope_group: "EntraSync-Include"
+entra_sync_scope_group_ou: "OU=Groups,DC=camlab,DC=local"
+entra_connector_account_name: "svc-entraconnect"
+entra_connector_account_ou: "OU=ServiceAccounts,DC=camlab,DC=local"
