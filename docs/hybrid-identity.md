@@ -103,6 +103,53 @@ standard `DEVICE_AUTO` sync-join method, which succeeded. This is
 expected behavior for a PHS-only setup without additional Cloud Kerberos
 trust configuration — the fallback is by design, not a fault.
 
+**Privileged account in sync scope caused a persistent export failure.**
+`cparent-adm` (member of Domain Admins and Enterprise Admins) was
+initially included in `EntraSync-Include` for sync validation testing.
+Every export cycle against `camlab.local` returned
+`completed-export-errors` with error code 8344
+("Insufficient access rights to perform the operation") against this
+object specifically, with a retry count climbing across multiple full
+and delta cycles. Root cause was two-layered:
+
+1. AD's AdminSDHolder/SDProp process runs hourly and forcibly overwrites
+   the ACL on any object flagged as protected (`AdminCount: 1`),
+   disabling permission inheritance from the domain root. This silently
+   stripped the inherited `dsacls` grant given to `svc-entraconnect`,
+   confirmed via `dsacls "CN=Cameron Parent (Admin),..."` returning no
+   entries for the account at all, despite the grant existing correctly
+   at the domain root.
+2. The specific write being attempted was a `ms-DS-ConsistencyGuid`
+   stamp — the sourceAnchor Entra Connect Sync writes back to an AD
+   object on its first sync. `svc-entraconnect` was deliberately granted
+   only the two read-side replication rights (`Replicating Directory
+   Changes`, `Replicating Directory Changes All`) with no write access,
+   so this write was always going to fail for this object — and, given
+   (1), no domain-root grant could have reached it regardless.
+
+Fix: removed `cparent-adm` from `EntraSync-Include` — the correct
+resolution architecturally, not just a permissions workaround, since
+break-glass/privileged accounts shouldn't sync to the cloud in the first
+place. The already-queued pending export for the object didn't clear on
+its own even after a full sync cycle (`Start-ADSyncSyncCycle -PolicyType
+Initial`), and GUI deletion via **Search Connector Space** was
+unavailable for this object state in the installed Entra Connect Sync
+version (no `Delete` option on right-click). Cleared it with the
+supported cmdlet instead (available since Entra Connect Sync 1.5.18.0):
+
+```powershell
+Import-Module "C:\Program Files\Microsoft Azure AD Sync\Bin\ADSync\ADSync.psd1"
+$csObj = Get-ADSyncCSObject -ConnectorName "camlab.local" `
+  -DistinguishedName "CN=Cameron Parent (Admin),CN=Users,DC=camlab,DC=local"
+Remove-ADSyncCSObject -ConnectorName "camlab.local" `
+  -DistinguishedName $csObj.DistinguishedName
+```
+
+Confirmed clean via a subsequent delta sync (`success`, 0 errors) and
+verified WS01 as **Microsoft Entra hybrid joined** in the Entra ID
+admin center — the correct end state this troubleshooting was
+validating in the first place.
+
 ## Running it
 
 ```bash
