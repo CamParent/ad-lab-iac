@@ -169,4 +169,14 @@ real sign-in logs, not just policy configuration. Full writeup in
 
 ## Roadmap
 
-Hybrid identity build (Entra Connect Sync, group-scoped PHS, Hybrid Azure AD Join) — **done**. Next: validating Conditional Access policy behavior against the hybrid-joined WS01, cross-referenced with the identity-as-code module in [`iac-foundation`](https://github.com/CamParent/iac-foundation).
+Hybrid identity build (Entra Connect Sync, group-scoped PHS, Hybrid Azure AD Join) — **done**.
+
+Conditional Access validation (MFA, legacy auth block, device compliance — see [`docs/conditional-access.md`](docs/conditional-access.md)) — **done**, validated against real sign-in logs in Report-only mode.
+
+Intune MDM enrollment — **in progress**. Licensing, MDM user scope, and a dedicated least-privilege pilot account (`intune-test01`) are correctly configured; enrollment itself is blocked by a client-side `DMClient`/CSP discovery error on WS01, still being diagnosed. `CA003-Pilot-RequireCompliantDevice`'s expected `Report-only: Failure` result against WS01 is a direct, useful consequence of this gap.
+
+Next:
+- Resolve the MDM enrollment blocker, confirm WS01 shows as Intune-managed and compliant
+- Re-test `CA003` for an expected `Report-only: Success` once resolved
+- Codify the three Conditional Access policies as Terraform (`azuread` provider), cross-referenced with the identity-as-code module in [`iac-foundation`](https://github.com/CamParent/iac-foundation)
+- Flip `CA001` (MFA) to enforced once confident, given its clean Report-only result
