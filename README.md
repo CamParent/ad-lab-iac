@@ -159,6 +159,14 @@ Documented in detail in [`docs/hybrid-identity.md`](docs/hybrid-identity.md), br
 - **Hybrid join failed with `error_missing_device`** — WS01's computer object was added to the scoping group, but no sync cycle had run since, so Entra ID had no device object to register against yet. Fixed by triggering a delta sync before retrying the join.
 - **Privileged account in sync scope caused a persistent export failure** — `cparent-adm` (Domain Admins/Enterprise Admins member) was initially included in `EntraSync-Include`. AD's AdminSDHolder/SDProp process disables permission inheritance on protected accounts, silently overriding the domain-root `dsacls` grant given to `svc-entraconnect`. This surfaced as a `ms-DS-ConsistencyGuid` writeback failure (error 8344, "Insufficient access rights") on every export cycle — expected, since `svc-entraconnect` was deliberately granted only read-side replication rights, and no domain-root grant reaches a protected object regardless. Fixed by removing the privileged account from sync scope (correct by design — break-glass/admin accounts shouldn't sync to the cloud) and clearing the resulting orphaned connector-space object via `Remove-ADSyncCSObject` (GUI delete was unavailable for this object state in the installed Entra Connect Sync version).
 
+## Conditional Access validation (Microsoft Entra ID P2)
+
+A first pass at Conditional Access was built and validated manually
+against the hybrid identity foundation above — three Report-only
+policies (MFA, legacy auth block, device compliance), tested against
+real sign-in logs, not just policy configuration. Full writeup in
+[`docs/conditional-access.md`](docs/conditional-access.md).
+
 ## Roadmap
 
 Hybrid identity build (Entra Connect Sync, group-scoped PHS, Hybrid Azure AD Join) — **done**. Next: validating Conditional Access policy behavior against the hybrid-joined WS01, cross-referenced with the identity-as-code module in [`iac-foundation`](https://github.com/CamParent/iac-foundation).
